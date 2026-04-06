@@ -1,0 +1,14 @@
+0.5
+1 This
+2 is
+3 a
+4 50
+5 percent
+6 packet
+7 loss
+8 test
+9 case
+10 for
+11 order-preserving,
+12 lossless
+13 TCP

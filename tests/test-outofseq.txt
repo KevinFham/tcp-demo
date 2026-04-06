@@ -1,0 +1,11 @@
+1.0
+1 This
+2 is
+3 an
+4 out-of-sequence
+5 test
+6 case
+7 for
+8 order-preserving,
+9 lossless
+10 TCP

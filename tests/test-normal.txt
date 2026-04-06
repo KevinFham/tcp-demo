@@ -1,0 +1,12 @@
+1.0
+1 This
+2 is
+3 a
+4 test
+5 of
+6 normal
+7 operation
+8 of
+9 order-preserving,
+10 lossless
+11 TCP

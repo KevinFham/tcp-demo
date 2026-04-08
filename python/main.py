@@ -8,11 +8,16 @@ import random
 
 RX_ADDR = "127.0.0.1"
 PORT = 65432
+UNACK_COUNT = 0
+REACK_COUNT = 0
 
 """
  Reciever Socket
 """
 def rx(pkt_loss_chance=1.0):
+    global UNACK_COUNT
+    global REACK_COUNT
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as r:
         r.bind((RX_ADDR, PORT))
         pkt_buffer = []
@@ -28,19 +33,29 @@ def rx(pkt_loss_chance=1.0):
 
                 # Buffer; EOF packet, push out buffer
                 if data_parsed[1] == '-1':
-                    sorted(pkt_buffer)
-                    print(" ".join([w[-1].replace("\n","") for w in pkt_buffer]))
+
+                    # Simulation conclusion
+                    print(f'Buffer seq (unsorted): {",".join([i[0] for i in pkt_buffer])}')
+                    pkt_buffer = sorted(pkt_buffer, key=lambda pkt: int(pkt[0]))
+                    print(f'Buffer seq (sorted): {",".join([i[0] for i in pkt_buffer])}')
+                    print(f'UnACK\'d pkts: {UNACK_COUNT}')
+                    print(f'Resent pkts: {REACK_COUNT}')
+                    print("Delivered msg:", " ".join([w[-1].replace("\n","") for w in pkt_buffer]))
                     pkt_buffer.clear()
                 else:
                     pkt_buffer.append(data_parsed)
                 r.sendto(bytes(f'{i_data} 1 ACK', "utf-8"), addr)
+            else:
+                UNACK_COUNT += 1
 
 """
  Transmitter Socket
 """
-def tx(pkt_seq=[]):
+def tx(pkt_seq=[], timeout_s=0.4):
+    global REACK_COUNT
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as t:
-        t.settimeout(0.4)
+        t.settimeout(timeout_s)
         for pkt in pkt_seq:
             while True:
                 t.sendto(bytes(pkt, "utf-8"), (RX_ADDR, PORT))
@@ -54,7 +69,8 @@ def tx(pkt_seq=[]):
                     # print(f'tx: {data_parsed} {t_d:.2f} ms')
                     break
                 except socket.timeout:
-                    print("timeout")
+                    print(f'timeout ({timeout_s * 1000} ms)')
+                    REACK_COUNT += 1
 
 
 if __name__ == '__main__':

@@ -1,12 +1,12 @@
 1.0
 1 0 This
 2 0 is
+10 0 TCP
 3 0 an
-4 0 out-of-sequence
+8 0 order-preserving,
 5 0 test
 6 0 case
 7 0 for
-8 0 order-preserving,
+4 0 out-of-sequence
 9 0 lossless
-10 0 TCP
 11 -1 EOF

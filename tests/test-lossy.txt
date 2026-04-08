@@ -1,8 +1,8 @@
-0.5
+0.7
 1 0 This
 2 0 is
 3 0 a
-4 0 50
+4 0 70
 5 0 percent
 6 0 packet
 7 0 loss

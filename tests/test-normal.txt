@@ -10,3 +10,4 @@
 9 0 order-preserving,
 10 0 lossless
 11 0 TCP
+12 -1 EOF

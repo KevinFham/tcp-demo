@@ -17,17 +17,32 @@ def rx(pkt_loss_chance=1.0):
         r.bind((RX_ADDR, PORT))
         while True:
             data, addr = r.recvfrom(1024)
-            print(f'pkt: {data}')
+            data_parsed = data.decode("utf-8").split(" ")
+            i_data = data_parsed[0]
+            print(f'rx: {data_parsed}')
 
             # Return ACK
             if random.random() < pkt_loss_chance:
-                r.sendto(b'-1 1 ACK', addr)
+                r.sendto(bytes(f'{i_data} 1 ACK', "utf-8"), addr)
 
 """
  Transmitter Socket
 """
-tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-tx.settimeout(1.0)
+def tx(pkt_seq=[]):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as t:
+        t.settimeout(1.0)
+        for pkt in pkt_seq:
+            t_start = time.time()
+            t.sendto(bytes(pkt, "utf-8"), (RX_ADDR, PORT))
+
+            # Await ACK
+            try:
+                data, addr = t.recvfrom(1024)
+                t_d = (time.time() - t_start) * 1000
+                data_parsed = data.decode("utf-8").split(" ")
+                print(f'tx: {data_parsed} {t_d:.2f} ms')
+            except socket.timeout:
+                print("timeout")
 
 
 if __name__ == '__main__':
@@ -47,18 +62,7 @@ if __name__ == '__main__':
 
     # Transmit Packets
     pkt_seq = txt.readlines()
-    for pkt in pkt_seq:
-        t_start = time.time()
-        tx.sendto(bytes(pkt, "utf-8"), (RX_ADDR, PORT))
-
-        # Await ACK
-        try:
-            data, addr = tx.recvfrom(1024)
-            t_d = (time.time() - t_start) * 1000
-            print(f'{data} {t_d:.2f} ms')
-        except socket.timeout:
-            print("timeout")
-
+    tx(pkt_seq)
 
     # End
     txt.close()

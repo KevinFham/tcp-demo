@@ -1,12 +1,12 @@
 1.0
-1 This
-2 is
-3 a
-4 test
-5 of
-6 normal
-7 operation
-8 of
-9 order-preserving,
-10 lossless
-11 TCP
+1 0 This
+2 0 is
+3 0 a
+4 0 test
+5 0 of
+6 0 normal
+7 0 operation
+8 0 of
+9 0 order-preserving,
+10 0 lossless
+11 0 TCP

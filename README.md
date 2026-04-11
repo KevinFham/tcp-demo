@@ -19,7 +19,7 @@ python3 python/main.py tests/test-normal.txt
 
 ## C Instructions
 
-Compile `main.c`
+Compile `c/main.c`
 
 ```bash
 gcc c/main.c -o main

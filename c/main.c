@@ -23,7 +23,6 @@ const unsigned int PORT = 65432;
 unsigned int UNACK_COUNT = 0;
 unsigned int REACK_COUNT = 0;
 
-
 struct pktSequence {
     char** pkts;
     // char* pkts[MAX_PKT_SEQ][MAX_BUFFER];
@@ -74,7 +73,7 @@ void* rx(void* arg) {
     while (1) {
         memset(buffer, '\0', MAX_BUFFER);
         int recv = recvfrom(sockfd, (char*)buffer, sizeof(buffer), MSG_WAITALL,
-                            (struct sockaddr*)&txAddr, &len);
+                            (struct sockaddr*)&txAddr, &len);  // Blocking until incoming packet is received
         char recvPkt[MAX_BUFFER];
         strncpy(recvPkt, buffer, sizeof(buffer));
         char recvPktSeqNum[8] = "0";
@@ -84,12 +83,14 @@ void* rx(void* arg) {
         recvPktToken = strtok(NULL, " ");
         strncpy(recvPktFlag, recvPktToken, strlen(recvPktToken));
 
-        // Return ACK
+        // Return ACK based on % chance
         float pktLoss = (float)rand() / RAND_MAX;
         if (pktLoss < *pktLossChance) {
             // If EOF Packet, push out buffer. Else send to buffer
             if (strcmp(recvPktFlag, "-1") == 0) {
-                // Simulation Conclusion + Flush Buffer
+                /*
+                 * Simulation Conclusion + Flush Buffer
+                 */
                 printf("Buffer Seq (unsorted): ");
                 for (int i = 0; i < recvPktSeq->seqLen; i++) {
                     char pkt[MAX_BUFFER];
@@ -134,7 +135,7 @@ void* rx(void* arg) {
                     printf(" ");
                 }
                 printf("\n");
-                
+
                 // Flush buffer
                 for (int i = 0; i < recvPktSeq->seqLen; i++) {
                     memset(recvPktSeq->pkts[i], '\0', MAX_BUFFER);
@@ -144,7 +145,7 @@ void* rx(void* arg) {
                 strncpy(recvPktSeq->pkts[recvPktSeq->seqLen++], recvPkt, MAX_BUFFER);
             }
 
-            // Send ACK
+            // Send ACK packet
             char ackPkt[MAX_BUFFER];
             snprintf(ackPkt, MAX_BUFFER, "%s 1 ACK", recvPktSeqNum);
             int sent = sendto(sockfd, ackPkt, MAX_BUFFER, MSG_WAITALL,
@@ -189,14 +190,13 @@ void* tx(struct pktSequence* pktSeq, float timeoutms) {
             char* sendPktToken = strtok(sendPkt, " ");
             strncpy(sendPktSeqNum, sendPktToken, strlen(sendPktToken));
 
-            // Send
+            // Send current packet in sequence
             int sent = sendto(sockfd, pktSeq->pkts[i], MAX_BUFFER, MSG_WAITALL,
                               (struct sockaddr*)&rxAddr, len);
 
             // Await ACK, retry if UNACK
             memset(buffer, '\0', MAX_BUFFER);
-            if (recvfrom(sockfd, (char*)buffer, sizeof(buffer), MSG_WAITALL,
-                         (struct sockaddr*)&rxAddr, &len) > -1) {
+            if (recvfrom(sockfd, (char*)buffer, sizeof(buffer), MSG_WAITALL, (struct sockaddr*)&rxAddr, &len) > -1) {
                 char pktSeqNum[8] = "0";
                 char pktFlag[8] = "0";
                 char* token = strtok(buffer, " ");
@@ -222,23 +222,23 @@ void* tx(struct pktSequence* pktSeq, float timeoutms) {
 int main(int argc, char** argv) {
     srand(time(NULL));
 
+    // Args + Grab TXT file for test case
     if (argc != 2) {
         printf("Usage: %s txt_file\n", argv[0]);
         printf("    txt_file: Text file containing test case\n");
         exit(1);
     }
-
     if (!strstr(argv[1], ".txt")) {
         fprintf(stderr, "File path does not point to a text file!\n");
         exit(1);
     }
-
     FILE* fptr = fopen(argv[1], "r");
     if (fptr == NULL) {
         fprintf(stderr, "Failed to open %s\n", argv[1]);
         exit(1);
     }
 
+    // Populate packet loss chance and packet sequence to test
     char pktLossChanceStr[MAX_BUFFER];
     fgets(pktLossChanceStr, MAX_BUFFER, fptr);
     float pktLossChance = atof(pktLossChanceStr);

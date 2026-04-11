@@ -22,7 +22,7 @@ python3 python/main.py tests/test-normal.txt
 Compile `main.c`
 
 ```bash
-gcc main.c -o main
+gcc c/main.c -o main
 ```
 
 Run the program with a file path to a txt file. For example:

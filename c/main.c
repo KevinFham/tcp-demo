@@ -23,16 +23,22 @@ const unsigned int PORT = 65432;
 unsigned int UNACK_COUNT = 0;
 unsigned int REACK_COUNT = 0;
 
-void delay(int msec) {
-    clock_t startTime = clock();
-    while (clock() < startTime + msec);
-}
 
 struct pktSequence {
     char** pkts;
     // char* pkts[MAX_PKT_SEQ][MAX_BUFFER];
     int seqLen;
 };
+
+int pktSortAsc(const void* a, const void* b) {
+    char aPkt[MAX_BUFFER];
+    char bPkt[MAX_BUFFER];
+    strncpy(aPkt, *(char**)a, sizeof(*(char**)a));
+    strncpy(bPkt, *(char**)b, sizeof(*(char**)b));
+    char* aTok = strtok(aPkt, " ");
+    char* bTok = strtok(bPkt, " ");
+    return (atoi(aTok) - atoi(bTok));
+}
 
 /*
  * Reciever Socket
@@ -71,35 +77,81 @@ void* rx(void* arg) {
                             (struct sockaddr*)&txAddr, &len);
         char recvPkt[MAX_BUFFER];
         strncpy(recvPkt, buffer, sizeof(buffer));
-        char pktSeqNum[8];
-        char pktFlag[8];
+        char recvPktSeqNum[8] = "0";
+        char recvPktFlag[8] = "0";
         char* recvPktToken = strtok(buffer, " ");
-        strncpy(pktSeqNum, recvPktToken, strlen(recvPktToken));
+        strncpy(recvPktSeqNum, recvPktToken, strlen(recvPktToken));
         recvPktToken = strtok(NULL, " ");
-        strncpy(pktFlag, recvPktToken, strlen(recvPktToken));
+        strncpy(recvPktFlag, recvPktToken, strlen(recvPktToken));
 
         // Return ACK
         float pktLoss = (float)rand() / RAND_MAX;
         if (pktLoss < *pktLossChance) {
             // If EOF Packet, push out buffer. Else send to buffer
-            if (strcmp(pktFlag, "-1") == 0) {
-                printf("pkt seq recvd:\n");
+            if (strcmp(recvPktFlag, "-1") == 0) {
+                // Simulation Conclusion + Flush Buffer
+                printf("Buffer Seq (unsorted): ");
                 for (int i = 0; i < recvPktSeq->seqLen; i++) {
-                    printf("%s\n", recvPktSeq->pkts[i]);
+                    char pkt[MAX_BUFFER];
+                    strncpy(pkt, recvPktSeq->pkts[i], MAX_BUFFER);
+                    char pktSeqNum[8] = "0";
+                    char* pktToken = strtok(pkt, " ");
+                    strncpy(pktSeqNum, pktToken, strlen(pktToken));
+
+                    printf("%s ", pktSeqNum);
                 }
-                // flush buffer
+
+                printf("\nBuffer Seq (sorted): ");
+                qsort(recvPktSeq->pkts, recvPktSeq->seqLen, sizeof(recvPktSeq->pkts[0]), pktSortAsc);
+                for (int i = 0; i < recvPktSeq->seqLen; i++) {
+                    char pkt[MAX_BUFFER];
+                    strncpy(pkt, recvPktSeq->pkts[i], MAX_BUFFER);
+                    char pktSeqNum[8] = "0";
+                    char* pktToken = strtok(pkt, " ");
+                    strncpy(pktSeqNum, pktToken, strlen(pktToken));
+
+                    printf("%s ", pktSeqNum);
+                }
+
+                printf("\nUnACK\'d pkts: %u", UNACK_COUNT);
+                printf("\nResent pkts: %u", REACK_COUNT);
+                printf("\nDelivered msg: ");
+                for (int i = 0; i < recvPktSeq->seqLen; i++) {
+                    char pkt[MAX_BUFFER];
+                    strncpy(pkt, recvPktSeq->pkts[i], MAX_BUFFER);
+                    char pktData[MAX_BUFFER] = "";
+                    char* pktToken = strtok(pkt, " ");
+                    pktToken = strtok(NULL, " ");
+                    pktToken = strtok(NULL, " ");
+
+                    // Skip the line carry '\n'
+                    for (int j = 0; j < MAX_BUFFER; j++) {
+                        if (pktToken[j] == '\n') {
+                            break;
+                        }
+                        printf("%c", pktToken[j]);
+                    }
+                    printf(" ");
+                }
+                printf("\n");
+                
+                // Flush buffer
+                for (int i = 0; i < recvPktSeq->seqLen; i++) {
+                    memset(recvPktSeq->pkts[i], '\0', MAX_BUFFER);
+                }
+                recvPktSeq->seqLen = 0;
             } else {
-                strncpy(recvPktSeq->pkts[recvPktSeq->seqLen++], recvPkt,
-                        MAX_BUFFER);
+                strncpy(recvPktSeq->pkts[recvPktSeq->seqLen++], recvPkt, MAX_BUFFER);
             }
 
+            // Send ACK
             char ackPkt[MAX_BUFFER];
-            snprintf(ackPkt, MAX_BUFFER, "%s 1 ACK", pktSeqNum);
+            snprintf(ackPkt, MAX_BUFFER, "%s 1 ACK", recvPktSeqNum);
             int sent = sendto(sockfd, ackPkt, MAX_BUFFER, MSG_WAITALL,
                               (struct sockaddr*)&txAddr, len);
-            printf("RX: send ACK\n");
         } else {
-            printf("RX: fail send ACK\n");
+            // Fail ACK send
+            UNACK_COUNT += 1;
         }
     }
 }
@@ -133,7 +185,7 @@ void* tx(struct pktSequence* pktSeq, float timeoutms) {
         while (1) {
             char sendPkt[MAX_BUFFER];
             strncpy(sendPkt, pktSeq->pkts[i], MAX_BUFFER);
-            char sendPktSeqNum[8];
+            char sendPktSeqNum[8] = "0";
             char* sendPktToken = strtok(sendPkt, " ");
             strncpy(sendPktSeqNum, sendPktToken, strlen(sendPktToken));
 
@@ -145,8 +197,8 @@ void* tx(struct pktSequence* pktSeq, float timeoutms) {
             memset(buffer, '\0', MAX_BUFFER);
             if (recvfrom(sockfd, (char*)buffer, sizeof(buffer), MSG_WAITALL,
                          (struct sockaddr*)&rxAddr, &len) > -1) {
-                char pktSeqNum[8];
-                char pktFlag[8];
+                char pktSeqNum[8] = "0";
+                char pktFlag[8] = "0";
                 char* token = strtok(buffer, " ");
                 strncpy(pktSeqNum, token, strlen(token));
                 token = strtok(NULL, " ");
@@ -158,6 +210,7 @@ void* tx(struct pktSequence* pktSeq, float timeoutms) {
                 printf("TX: Invalid ACK");
             } else {
                 printf("TX: Timeout (%i ms)\n", TIMEOUT_MS);
+                REACK_COUNT += 1;
             }
         }
     }
